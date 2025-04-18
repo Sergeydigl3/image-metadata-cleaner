@@ -7,9 +7,10 @@ import os
 selected_files = []
 thumbnails = []
 
-CARD_WIDTH = 100
-CARD_HEIGHT = 120
-IMG_SIZE = (80, 80)
+CARD_WIDTH = 300
+CARD_HEIGHT = 350
+IMG_SIZE = (200, 200)
+COLUMNS_MIN_WIDTH = 120  # Минимальная ширина на одну карточку
 
 
 def is_png_file(path):
@@ -102,14 +103,23 @@ def update_preview():
 
     count_label.config(text=f"Выбрано файлов: {len(selected_files)}")
 
-    for f in selected_files:
+    if not selected_files:
+        return
+
+    canvas_width = preview_canvas.winfo_width()
+    if canvas_width == 1:
+        canvas_width = root.winfo_width()
+
+    columns = max(1, canvas_width // COLUMNS_MIN_WIDTH)
+
+    for idx, f in enumerate(selected_files):
         try:
             img = Image.open(f).resize(IMG_SIZE)
             tk_img = ImageTk.PhotoImage(img)
             thumbnails.append(tk_img)
 
             frame = tk.Frame(preview_frame, width=CARD_WIDTH, height=CARD_HEIGHT, bd=1, relief="groove")
-            frame.pack_propagate(False)
+            frame.grid_propagate(False)
 
             label = tk.Label(frame, image=tk_img)
             label.pack()
@@ -117,46 +127,53 @@ def update_preview():
             caption = tk.Label(frame, text=os.path.basename(f), wraplength=90, font=("Segoe UI", 8))
             caption.pack(pady=(2, 0))
 
-            frame.pack(side=tk.LEFT, padx=5, pady=5)
+            row = idx // columns
+            col = idx % columns
+            frame.grid(row=row, column=col, padx=5, pady=5)
         except:
             continue
+
+    preview_canvas.configure(scrollregion=preview_canvas.bbox("all"))
+
+
+def on_resize(event):
+    update_preview()
 
 
 # ────────── UI ──────────
 
 root = TkinterDnD.Tk()
 root.title("Batch PNG Metadata Remover")
-root.geometry("720x620")
+root.geometry("800x700")
+root.minsize(400, 500)
 root.configure(bg="#f4f4f4")
 
 style_font = ("Segoe UI", 10)
 
 # Верх: превью
 preview_wrapper = tk.LabelFrame(root, text="Превью загруженных файлов", font=style_font, bg="#f4f4f4")
-preview_wrapper.pack(fill=tk.X, padx=10, pady=10)
+preview_wrapper.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-preview_canvas = tk.Canvas(preview_wrapper, height=150, bg="#ffffff")
-scrollbar = tk.Scrollbar(preview_wrapper, orient=tk.HORIZONTAL, command=preview_canvas.xview)
-preview_canvas.configure(xscrollcommand=scrollbar.set)
+preview_canvas = tk.Canvas(preview_wrapper, bg="#ffffff")
+preview_canvas.drop_target_register(DND_FILES)
+preview_canvas.dnd_bind('<<Drop>>', drop_event)
+v_scroll = tk.Scrollbar(preview_wrapper, orient=tk.VERTICAL, command=preview_canvas.yview)
+preview_canvas.configure(yscrollcommand=v_scroll.set)
 
-scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 preview_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 preview_frame = tk.Frame(preview_canvas, bg="#ffffff")
-preview_canvas.create_window((0, 0), window=preview_frame, anchor="nw")
+canvas_window = preview_canvas.create_window((0, 0), window=preview_frame, anchor="nw")
 
-
-def resize_canvas(event):
-    preview_canvas.configure(scrollregion=preview_canvas.bbox("all"))
-
-
-preview_frame.bind("<Configure>", resize_canvas)
+preview_frame.bind("<Configure>", lambda e: preview_canvas.configure(scrollregion=preview_canvas.bbox("all")))
+preview_canvas.bind("<Configure>", on_resize)
 
 # Зона дропа
 drop_zone = tk.Label(root, text="⬇ Перетащите PNG файлы или папки сюда ⬇",
                      relief="groove", font=("Segoe UI", 11, "bold"),
-                     width=60, height=5, bg="#e0f7fa", fg="#006064")
-drop_zone.pack(padx=10, pady=10, fill=tk.X)
+                     height=4, bg="#e0f7fa", fg="#006064")
+drop_zone.pack(padx=10, pady=10, fill=tk.BOTH)
 drop_zone.drop_target_register(DND_FILES)
 drop_zone.dnd_bind('<<Drop>>', drop_event)
 
