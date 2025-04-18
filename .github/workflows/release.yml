@@ -1,0 +1,42 @@
+name: Build and Release App (All Platforms)
+
+on:
+  push:
+    tags:
+      - 'latest'
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build with PyInstaller
+        run: |
+          uv run pyinstaller main.py --onefile --name metadata-cleaner
+
+      - name: Package build
+        run: |
+          mkdir release
+          cp dist/metadata-cleaner* release/
+          cd release
+          zip metadata-cleaner-${{ runner.os }}.zip *
+
+      - name: Upload binary to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+            tag_name: latest
+            name: Latest Release
+            files: |
+                dist/metadata-cleaner*
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
